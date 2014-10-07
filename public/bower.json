@@ -1,0 +1,9 @@
+{
+  "name": "video_quiz",
+  "version": "0.0.1",
+  "dependencies": {
+    "jquery": "~1.9.0",
+    "popcorn-js": "~1.5.10"
+  },
+  "devDependencies": {}
+}
