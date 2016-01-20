@@ -96,14 +96,17 @@
       mediaReadyCallbacks.unshift( callback );
     }
 
-    function onReady() {
-      // JWPlayer needs a play/pause to force ready state.
-      // However, the ready state does not happen until after the play/pause callbacks.
-      // So we put this inside a setTimeout to ensure we do this afterwards,
-      // thus, actually being ready.
-      setTimeout( function() {
-        impl.duration = player.getDuration();
+    function waitForMetaData(){
+      var duration = player.getDuration();
+      //JWPlayer sets the duration only after the video has started playing
+      //Hence, we assume that when duration is available all
+      //other metadata is also ready
+      if(duration == -1 || duration == undefined){
+        setTimeout(waitForMetaData, 0);
+      } else {
+        impl.duration = duration
         self.dispatchEvent( "durationchange" );
+        playerReady = true;
         impl.readyState = self.HAVE_METADATA;
         self.dispatchEvent( "loadedmetadata" );
         self.dispatchEvent( "loadeddata" );
@@ -121,7 +124,12 @@
         // We can't easily determine canplaythrough, but will send anyway.
         impl.readyState = self.HAVE_ENOUGH_DATA;
         self.dispatchEvent( "canplaythrough" );
-      }, 0 );
+      }
+    }
+
+    function onReady() {
+      // JWPlayer needs a play/pause to force ready state.
+      waitForMetaData();
     }
 
     // TODO: (maybe)
@@ -237,12 +245,22 @@
         destroyPlayer();
       }
 
-      jwplayer( parent.id ).setup({
-        file: aSrc,
+      var params = {
         width: "100%",
         height: "100%",
+        autostart: impl.autoplay,
         controls: impl.controls
-      });
+      };
+
+      // Source can either be a single file or multiple files that represent
+      // different quality
+      if(typeof aSrc == "string"){
+        params["file"] = aSrc;
+      } else {
+        params["sources"] = aSrc;
+      }
+
+      jwplayer( parent.id ).setup(params);
 
       player = jwplayer( parent.id );
       player.onReady( onPlayerReady );
@@ -308,7 +326,7 @@
     function onPlay() {
       impl.paused = false;
 
-      if ( playerPaused ) {
+      if ( playerReady && playerPaused ) {
         playerPaused = false;
 
         // Only 1 play when video.loop=true
@@ -552,10 +570,16 @@
   };
 
   // Helper for identifying URLs we know how to play.
-  Popcorn.HTMLJWPlayerVideoElement._canPlaySrc = function( url ) {
+  Popcorn.HTMLJWPlayerVideoElement._canPlaySrc = function( source ) {
     // Because of the nature of JWPlayer playing all media types,
     // it can potentially play all url formats.
-    return "probably";
+    if(typeof source == "string"){
+      if(/.+\.+/g.exec(source)){
+        return "probably";
+      }
+    } else {
+      return "probably"
+    }
   };
 
   // This could potentially support everything. It is a bit of a catch all player.
